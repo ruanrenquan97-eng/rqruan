@@ -16,9 +16,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "../../"); // Go up to project root
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(rootDir, "client", "public", "uploads");
-if (!fs.existsSync(uploadsDir)) {
+const isVercel = !!process.env.VERCEL;
+// Vercel only allows writing to /tmp
+const uploadsDir = isVercel ? '/tmp' : path.join(rootDir, "client", "public", "uploads");
+
+if (!isVercel && !fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
@@ -36,6 +38,33 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 5 * 1024 * 1024 }
 });
+
+const app = express();
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    const fileUrl = `/uploads/${req.file.filename}`;
+    res.json({ url: fileUrl });
+  } catch (error) {
+    console.error("Upload error:", error);
+    res.status(500).json({ message: "Upload failed" });
+  }
+});
+
+registerOAuthRoutes(app);
+
+app.use(
+  "/api/trpc",
+  createExpressMiddleware({
+    router: appRouter,
+    createContext,
+  })
+);
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -56,56 +85,30 @@ async function findAvailablePort(startPort: number = 3008): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function startServer() {
-  console.log("Starting server...");
-  console.log("NODE_ENV:", process.env.NODE_ENV);
-  const app = express();
+if (!isVercel) {
   const server = createServer(app);
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-  // File Upload Route
-  app.post("/api/upload", upload.single("file"), (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ message: "No file uploaded" });
-      }
-      const fileUrl = `/uploads/${req.file.filename}`;
-      res.json({ url: fileUrl });
-    } catch (error) {
-      console.error("Upload error:", error);
-      res.status(500).json({ message: "Upload failed" });
+  (async () => {
+    console.log("Starting server...");
+    console.log("NODE_ENV:", process.env.NODE_ENV);
+    if (process.env.NODE_ENV?.trim() === "development") {
+      await setupVite(app, server);
+    } else {
+      serveStatic(app);
     }
-  });
 
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
-  // tRPC API
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV?.trim() === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+    const preferredPort = parseInt(process.env.PORT || "3008");
+    const port = await findAvailablePort(preferredPort);
 
-  const preferredPort = parseInt(process.env.PORT || "3008");
-  const port = await findAvailablePort(preferredPort);
+    if (port !== preferredPort) {
+      console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+    }
 
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+    server.listen(port, () => {
+      console.log(`Server running on http://localhost:${port}/`);
+    });
+  })().catch(console.error);
 }
 
-startServer().catch(console.error);
+// Export the Express app for Vercel's Serverless Functions
+export default app;
