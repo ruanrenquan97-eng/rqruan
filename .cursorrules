@@ -1,0 +1,10 @@
+# Project Rules & Terminal Command Policy
+
+- **Terminal Commands**: NEVER use the `run_command` tool or any tool that executes commands on the host system automatically. 
+- **Manual Execution**: All terminal commands (installations, migrations, builds, etc.) must be provided to the USER in a standard markdown code block for manual execution.
+- **Explicit Instructions**: When providing a command, specify:
+    1. The purpose of the command.
+    2. Expected output or success indicators.
+    3. Any specific feedback needed from the USER after execution.
+- **Workflow Stability**: If a command is known to be unstable or may cause the environment to hang (e.g., some database push commands), prioritize alternative solutions like direct file modifications or provide specific troubleshooting steps.
+- **Respect User Feedback**: Always wait for the USER to confirm the result of a manual command before proceeding with dependent tasks.

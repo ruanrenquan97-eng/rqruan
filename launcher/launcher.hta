@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI System Control Panel</title>
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <hta:application 
+        id="app"
+        applicationname="AI System Control Panel"
+        border="thick"
+        caption="yes"
+        icon=""
+        showintaskbar="yes"
+        singleinstance="yes"
+        sysmenu="yes"
+        windowstate="normal"
+        navigable="yes"
+        scroll="no"
+    />
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            width: 300px;
+            text-align: center;
+        }
+        h2 {
+            margin-top: 0;
+            color: #1f2937;
+            font-size: 20px;
+            margin-bottom: 25px;
+        }
+        .status {
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #6b7280;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .btn-start {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-start:hover { background-color: #059669; }
+        
+        .btn-restart {
+            background-color: #f59e0b;
+            color: white;
+        }
+        .btn-restart:hover { background-color: #d97706; }
+        
+        .btn-stop {
+            background-color: #ef4444;
+            color: white;
+        }
+        .btn-stop:hover { background-color: #dc2626; }
+        
+        .divider {
+            height: 1px;
+            background-color: #e5e7eb;
+            margin: 20px 0;
+            width: 100%;
+        }
+        
+        .btn-link {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-link:hover { background-color: #2563eb; }
+        
+        small {
+            display: block;
+            margin-top: 15px;
+            color: #9ca3af;
+            font-size: 11px;
+        }
+    </style>
+    <script type="text/javascript">
+        var shell = new ActiveXObject("WScript.Shell");
+        var fso = new ActiveXObject("Scripting.FileSystemObject");
+        
+        function getBatchPath(filename) {
+            var path = window.location.pathname;
+            path = path.replace(/^file:\/\/\//i, "").replace(/^file:\/\//i, "");
+            if (path.indexOf("/") == 0 || path.indexOf("\\") == 0) {
+                path = path.substring(1);
+            }
+            path = path.replace(/\//g, "\\");
+            path = decodeURIComponent(path);
+            var currentDir = fso.GetParentFolderName(path);
+            return currentDir + "\\" + filename;
+        }
+
+        function runBatch(filename) {
+            try {
+                var batchFile = getBatchPath(filename);
+                // 0 means hide window if possible, but for 'start' command it might still show
+                // We show the logic window (start_server.bat uses 'start' to spawn new window)
+                shell.Run("cmd /c start \"\" \"" + batchFile + "\"", 0, false);
+            } catch (e) {
+                alert("Error: " + e.message);
+            }
+        }
+
+        function startServer() {
+            runBatch("start_server.bat");
+            // alert("Server starting...");
+            document.getElementById("status").innerText = "Status: Sending Start Command...";
+            setTimeout(function(){ document.getElementById("status").innerText = "Status: Server Running (Check Window)"; }, 2000);
+        }
+
+        function stopServer() {
+            runBatch("stop_server.bat");
+            document.getElementById("status").innerText = "Status: Stopping Server...";
+            setTimeout(function(){ document.getElementById("status").innerText = "Status: Server Stopped"; }, 2000);
+        }
+
+        function restartServer() {
+            stopServer();
+            setTimeout(function() {
+                startServer();
+            }, 2000); // Wait a bit for stop to process
+        }
+
+        function openUrl(url) {
+            shell.Run(url);
+        }
+
+        function resizeWindow() {
+            window.resizeTo(380, 550);
+        }
+    </script>
+</head>
+<body onload="resizeWindow()">
+    <div class="container">
+        <h2>AI System Control</h2>
+        <div id="status" class="status">Status: Ready</div>
+        
+        <button class="btn-start" onclick="startServer()">Start Service</button>
+        <button class="btn-restart" onclick="restartServer()">Restart Service</button>
+        <button class="btn-stop" onclick="stopServer()">Stop Service</button>
+        
+        <div class="divider"></div>
+        
+        <button class="btn-link" onclick="openUrl('http://localhost:3008')">Open Frontend (Home)</button>
+        <button class="btn-link" onclick="openUrl('http://localhost:3008/admin')">Open Backend (Admin)</button>
+
+        <small>Mellpro Swiss Innovation Center</small>
+    </div>
+</body>
+</html>
